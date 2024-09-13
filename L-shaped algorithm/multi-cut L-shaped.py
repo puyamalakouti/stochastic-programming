@@ -17,8 +17,8 @@ SurplusReward = 1
 # Master Problem
 mlp = LpProblem('MasterLinearProblem', sense=LpMinimize)
 x1 = LpVariable.dicts("x1", invest, lowBound=0, cat="continuous")
-theta = LpVariable('Theta', cat="continuous")
-mlp += theta
+theta = LpVariable.dicts('Theta', [s for s in scenarios], cat="continuous")
+mlp += lpSum(theta[s] for s in scenarios)
 mlp += lpSum(x1[i] for i in invest) == InitialInvest
 
 # Sub problems
@@ -42,7 +42,7 @@ for s1 in scenarios:
     for name, constraint in sbp.constraints.items():
         coeef_row = []
         for var in mlp.variables():
-            if var != theta:
+            if var != theta[1] and var != theta[2]:
                 coeff = constraint.get(var, 0)
                 coeef_row.append(coeff)
         T_tmp.append(coeef_row)
@@ -51,13 +51,15 @@ for s1 in scenarios:
 # Implementing Algorithm ...
 # L-shape method for 2-stage financial planning stochastic problem:
 # Step 0: Set parameters (r, s, v)
-r, v, s = 0, 0, 0
+r = 0
+v = 0
+s = 0
 
 # Step 1: solve Master Linear Problem
 mlp = LpProblem('MasterLinearProblem', sense=LpMinimize)
 x1 = LpVariable.dicts("x1", invest, lowBound=0, cat="continuous")
-theta = LpVariable('Theta', cat="continuous")
-mlp += theta
+theta = LpVariable.dicts('Theta', [s for s in scenarios], cat="continuous")
+mlp += lpSum(theta[s] for s in scenarios)
 mlp += lpSum(x1[i] for i in invest) == InitialInvest
 
 meet_stop_constraint = False
@@ -67,11 +69,11 @@ while not meet_stop_constraint:
     mlp.solve(PULP_CBC_CMD(msg=False, keepFiles=True))
     print("objective: ", value(mlp.objective))
     if v == 1:
-        theta_v = -math.inf
-    else:
-        theta_v = value(mlp.objective)
-
-    print(f"Theta iteration {v} is {theta_v}")
+        for s in scenarios:
+            theta[s].varValue = -math.inf
+    
+    for s in scenarios:
+        print(f"Theta_{s}: {theta[s].varValue}")
 
     # Step 2: check that step 1 solution available on K2 or not.
     print(f"iteration {v} - step 2:")
@@ -114,10 +116,10 @@ while not meet_stop_constraint:
 
     # Step 3: solve SubProblem based on each scenario (K= 1, 2)
     print(f"Iteration {v} step 3")
-    E = []
-    e = []
     simplex_multiplier = {}
     for s1 in scenarios:
+        E = []
+        e = []
         sbp = LpProblem('SubProblem', sense=LpMinimize)
         y = LpVariable.dicts("y", [(s1) for s1 in scenarios], lowBound=0, cat="continuous")
         w = LpVariable.dicts("w", [(s1) for s1 in scenarios], lowBound=0, cat="continuous")
@@ -136,17 +138,18 @@ while not meet_stop_constraint:
 
         E.append(pScenario[s1-1] * np.array([simplex_multiplier[s1]]) @ np.array(T[s1]))
 
-    e_sum = sum(e)
-    E_sum = sum(E)
-    w = e_sum - E_sum @ np.array([x1[1].varValue, x1[2].varValue])
-    if w > theta_v:
-        s = s + 1
-        mlp.addConstraint(list(E_sum @ np.array([x1[1], x1[2]]))[0] + theta >= e_sum[0])
-        print("added optima1ity cut to step 1.")
-        print('---'*15)
-    else:
-        print('meeting stop condition!')
-        print('---'*15)
-        print(f"Master Problem Objective Function: {value(mlp.objective)}")
-        print(f"x1: {x1[1].varValue}, x2: {x1[2].varValue}")
-        meet_stop_constraint = True
+        e_sum = sum(e)
+        E_sum = sum(E)
+        w = e_sum - E_sum @ np.array([x1[1].varValue, x1[2].varValue])
+        if w > theta[s1].varValue:
+            s = s + 1
+            mlp.addConstraint(list(E_sum @ np.array([x1[1], x1[2]]))[0] + theta[s1] >= e_sum[0])
+            print(f"added optima1ity cut {list(E_sum @ np.array([x1[1], x1[2]]))[0] + theta >= e_sum[0]} to step 1.")
+        else:
+            print('meeting stop condition!')
+            print('---'*15)
+            print(f"Master Problem Objective Function: {value(mlp.objective)}")
+            print(f"x1: {x1[1].varValue}, x2: {x1[2].varValue}")
+            meet_stop_constraint = True
+            break
+    print("---"*15)
