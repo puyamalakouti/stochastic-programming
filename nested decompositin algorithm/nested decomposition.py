@@ -293,7 +293,7 @@ print(f"Nested Decomposition algorithm solved by {iters} iterations.")
 print("Stage 1: ")
 print("NLDS(1,1)")
 print("Objective Function: ", value(NLDS[1].objective))
-print("ِDecision Variables: ")
+print("Decision Variables: ")
 for v in NLDS[1].variables():
     print(f"{v.name}: {round(v.value(), 3)}")
 print("*" * 100)
@@ -302,7 +302,7 @@ print("Stage 2: ")
 for i in range(scenario[1]):
     print(f"NLDS({2}-{i + 1})")
     print("Objective Function: ", value(NLDS[2][i].objective))
-    print("ِDecision Variables: ")
+    print("Decision Variables: ")
     for v in NLDS[2][i].variables():
         print(f"{v.name}: {round(v.value(), 3)}")
 print("*" * 100)
@@ -311,7 +311,7 @@ print("Stage 3: ")
 for i in range(total_scenario):
     print(f"NLDS({3}-{i + 1})")
     print("Objective Function: ", value(NLDS[3][i].objective))
-    print("ِDecision Variables: ")
+    print("Decision Variables: ")
     for v in NLDS[3][i].variables():
         print(f"{v.name}: {round(v.value(), 3)}")
         
